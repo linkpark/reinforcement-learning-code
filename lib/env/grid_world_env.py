@@ -17,15 +17,15 @@ class GridworldEnv(discrete.DiscreteEnv):
         self.shape = shape
         # Return the product of array elements over a given axis.from
         # default environment shape is 4 * 4, thus the number of state is 16
-        nS = np.prod(shape)
-        nA = 4
+        self.nS = np.prod(shape)
+        self.nA = 4
 
         MAX_Y = shape[0]
         MAX_X = shape[1]
 
         P = {}
 
-        grid = np.arange(nS).reshape(shape)
+        grid = np.arange(self.nS).reshape(shape)
 
         # nditer is Efficient multi-dimensional iterator object to iterate over arrays.
         # “multi_index” causes a multi-index, or a tuple of indices with one per iteration dimension, to be tracked.
@@ -36,10 +36,10 @@ class GridworldEnv(discrete.DiscreteEnv):
             s = it.iterindex
             y, x = it.multi_index
 
-            P[s] = { a: [] for a in range(nA)}
+            P[s] = { a: [] for a in range(self.nA)}
 
             # To judge if it is a terminal state
-            is_done = lambda s: s == 0 or s == (nS - 1)
+            is_done = lambda s: s == 0 or s == (self.nS - 1)
 
             reward = 0.0 if is_done(s) else -1.0
 
@@ -57,6 +57,7 @@ class GridworldEnv(discrete.DiscreteEnv):
                 ns_down = s if y == (MAX_Y - 1) else s + MAX_X
                 ns_left = s if x == 0 else s - 1
 
+                #prob next state, reward, done
                 P[s][UP] = [(1.0, ns_up, reward, is_done(ns_up))]
                 P[s][RIGHT] = [(1.0, ns_right, reward, is_done(ns_right))]
                 P[s][DOWN] = [(1.0, ns_down, reward, is_done(ns_down))]
@@ -66,14 +67,14 @@ class GridworldEnv(discrete.DiscreteEnv):
 
 
         # Initial state distribution is uniform
-        isd = np.ones(nS) / nS
+        self.isd = np.ones(self.nS) / self.nS
 
         # We expose the model of the environment for educational purposes
         # This should not be used in any model-free learning algorithm
         self.P = P
 
         # call base class construct function
-        super(GridworldEnv, self).__init__(nS, nA, P, isd)
+        super(GridworldEnv, self).__init__(self.nS, self.nA, self.P, self.isd)
 
     def _render(self, mode='human', close=False):
         if close:
@@ -111,8 +112,9 @@ class GridworldEnv(discrete.DiscreteEnv):
 
 # test envs
 
-#grid_env = GridworldEnv()
-#grid_env._render()
+# grid_env = GridworldEnv()
+# print(grid_env.nS)
+# grid_env._render()
 
 
 
