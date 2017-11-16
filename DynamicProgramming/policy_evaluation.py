@@ -12,7 +12,7 @@ env = GridworldEnv()
 def policy_eval(policy, env, discount_factor=1.0, theta=0.00001):
     V = np.zeros(env.nS)
     while True:
-        delta = 0
+        delta = 0.0
         for s in range(env.nS):
             v = 0
             # extract action & action probability from policy
