@@ -18,6 +18,7 @@ def value_iteration(env, theta=0.0001, discount_factor =1.0):
         delta = 0.0
         for s in range(env.nS):
             action_values = np.zeros(env.nA)
+            # one step lookahead
             for a in range(env.nA):
                 for transition_prob, next_state, reward, done in env.P[s][a]:
                     action_values[a] += transition_prob * (reward + discount_factor * V[next_state])
