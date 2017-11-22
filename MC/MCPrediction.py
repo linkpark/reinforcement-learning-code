@@ -53,15 +53,21 @@ def mc_prediction(policy, env, num_episodes, discount_factor = 1.0):
                 break;
             state = next_state
 
-        states_in_episode = set([tuple(x[0]) for x in episodes])
+        states_in_episode = set(x[0] for x in episodes)
+        #print(states_in_episode)
+
+        #states_a = set([tuple(x[0]) for x in episodes])
+
 
         for state in states_in_episode:
+            # return following the first occurrence of s
             first_occurence_idx = next(i for i, x in enumerate(episodes) if x[0] == state)
 
             G = sum([x[2]*(discount_factor ** i ) for i,x in enumerate(episodes[first_occurence_idx:])])
 
             returns_sum[state] += G
             returns_count[state] += 1.0
+
             V[state] = returns_sum[state] / returns_count[state]
 
     return V
@@ -77,5 +83,5 @@ def sample_policy(observation):
 V_10k = mc_prediction(sample_policy, env, num_episodes=10000)
 plotting.plot_value_function(V_10k, title="10,000 Steps")
 
-V_500k = mc_prediction(sample_policy, env, num_episodes=500000)
-plotting.plot_value_function(V_500k, title="500,000 Steps")
+#V_500k = mc_prediction(sample_policy, env, num_episodes=500000)
+#plotting.plot_value_function(V_500k, title="500,000 Steps")
