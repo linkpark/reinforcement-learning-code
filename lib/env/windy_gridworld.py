@@ -97,6 +97,9 @@ class WindyGridworldEnv(discrete.DiscreteEnv):
 #print(env.step(1))
 #env.render()
 
+#s = env.reset()
+#print(s)
+
 #print(env.step(1))
 #env.render()
 
