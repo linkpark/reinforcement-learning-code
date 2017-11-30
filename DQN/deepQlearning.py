@@ -182,6 +182,10 @@ class ModelParametersCopier():
         e2_params = [t for t in tf.trainable_variables() if t.name.startswith(estimator2.scope)]
         e2_params = sorted(e2_params, key=lambda v: v.name)
 
+
+        # The zip() function take iterables (can be zero or more),
+        # makes iterator that aggregates elements based on the iterables passed,
+        # and returns an iterator of tuples.
         self.update_ops = []
         for e1_v, e2_v in zip(e1_params, e2_params):
             op = e2_v.assign(e1_v)
