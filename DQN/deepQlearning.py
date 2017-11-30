@@ -324,6 +324,8 @@ def deep_q_learning(sess,
         else:
             state = next_state
 
+    print("init replay_memory size {}".format(len(replay_memory)) )
+
     # Record videos
     # Add env Monitor wrapper
     env = Monitor(env, directory=monitor_path, video_callable=lambda count: count % record_video_every == 0, resume=True)
@@ -337,6 +339,8 @@ def deep_q_learning(sess,
         state = state_processor.process(sess, state)
         state = np.stack([state] * 4, axis=2)
         loss = None
+
+        print("replay_memory size {}".format(len(replay_memory)))
 
         # One step in the environment
         for t in itertools.count():
@@ -389,22 +393,22 @@ def deep_q_learning(sess,
             state = next_state
             total_t += 1
 
-            # Add summaries to tensorboard
-            episode_summary = tf.Summary()
-            episode_summary.value.add(simple_value=epsilon, tag="episode/epsilon")
-            episode_summary.value.add(simple_value=stats.episode_rewards[i_episode], tag="episode/reward")
-            episode_summary.value.add(simple_value=stats.episode_lengths[i_episode], tag="episode/length")
-            episode_summary.value.add(simple_value=current_process.cpu_percent(), tag="system/cpu_usage_percent")
-            episode_summary.value.add(simple_value=current_process.memory_percent(memtype="vms"),
-                                      tag="system/v_memeory_usage_percent")
-            q_estimator.summary_writer.add_summary(episode_summary, i_episode)
-            q_estimator.summary_writer.flush()
+        # Add summaries to tensorboard
+        episode_summary = tf.Summary()
+        episode_summary.value.add(simple_value=epsilon, tag="episode/epsilon")
+        episode_summary.value.add(simple_value=stats.episode_rewards[i_episode], tag="episode/reward")
+        episode_summary.value.add(simple_value=stats.episode_lengths[i_episode], tag="episode/length")
+        episode_summary.value.add(simple_value=current_process.cpu_percent(), tag="system/cpu_usage_percent")
+        episode_summary.value.add(simple_value=current_process.memory_percent(memtype="vms"),
+                                  tag="system/v_memeory_usage_percent")
+        q_estimator.summary_writer.add_summary(episode_summary, i_episode)
+        q_estimator.summary_writer.flush()
 
-            yield total_t, plotting.EpisodeStats(
-                episode_lengths=stats.episode_lengths[:i_episode + 1],
-                episode_rewards=stats.episode_rewards[:i_episode + 1])
+        yield total_t, plotting.EpisodeStats(
+            episode_lengths=stats.episode_lengths[:i_episode + 1],
+            episode_rewards=stats.episode_rewards[:i_episode + 1])
 
-        return stats
+    return stats
 
 
 tf.reset_default_graph()
@@ -431,9 +435,9 @@ with tf.Session() as sess:
                                     target_estimator=target_estimator,
                                     state_processor=state_processor,
                                     experiment_dir=experiment_dir,
-                                    num_episodes=10000,
-                                    replay_memory_size=500000,
-                                    replay_memory_init_size=50000,
+                                    num_episodes=100,
+                                    replay_memory_size=5000,
+                                    replay_memory_init_size=500,
                                     update_target_estimator_every=10000,
                                     epsilon_start=1.0,
                                     epsilon_end=0.1,
