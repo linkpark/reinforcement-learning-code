@@ -2,6 +2,7 @@ from collections import deque
 import random
 import numpy as np
 import tflearn
+import gym
 import argparse
 import tensorflow as tf
 
