@@ -9,12 +9,16 @@ import tensorflow as tf
 from gym import wrappers
 import pprint as pp
 
-# This class is designed for replay memory.
 class ReplayBuffer(object):
-    def __init__(self, buffer_size):
+
+    def __init__(self, buffer_size, random_seed=123):
+        """
+        The right side of the deque contains the most recent experiences
+        """
         self.buffer_size = buffer_size
         self.count = 0
         self.buffer = deque()
+        random.seed(random_seed)
 
     def add(self, s, a, r, t, s2):
         experience = (s, a, r, t, s2)
@@ -29,11 +33,6 @@ class ReplayBuffer(object):
         return self.count
 
     def sample_batch(self, batch_size):
-        """
-
-        :param batch_size:
-        :return:
-        """
         batch = []
 
         if self.count < batch_size:
@@ -50,8 +49,9 @@ class ReplayBuffer(object):
         return s_batch, a_batch, r_batch, t_batch, s2_batch
 
     def clear(self):
-        self.deque.clear()
+        self.buffer.clear()
         self.count = 0
+
 
 class ActorNetwork(object):
     def __init__(self, sess, state_dim, action_dim, action_bound, learning_rate, tau, batch_size):
