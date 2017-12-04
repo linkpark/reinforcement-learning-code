@@ -2,7 +2,11 @@ from collections import deque
 import random
 import numpy as np
 import tflearn
+import argparse
 import tensorflow as tf
+
+from gym import wrappers
+import pprint as pp
 
 # This class is designed for replay memory.
 class ReplayBuffer(object):
