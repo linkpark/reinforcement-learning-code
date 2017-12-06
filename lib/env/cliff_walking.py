@@ -82,19 +82,19 @@ class CliffWalkingEnv(discrete.DiscreteEnv):
         outfile.write("\n")
 
 
-env = CliffWalkingEnv()
+#env = CliffWalkingEnv()
 
-print(env.reset())
-env.render()
+#print(env.reset())
+#env.render()
 
-print(env.step(0))
-env.render()
+#print(env.step(0))
+#env.render()
 
-print(env.step(1))
-env.render()
+#print(env.step(1))
+#env.render()
 
-print(env.step(1))
-env.render()
+#print(env.step(1))
+#env.render()
 
-print(env.step(2))
-env.render()
+#print(env.step(2))
+#env.render()
