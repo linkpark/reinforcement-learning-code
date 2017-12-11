@@ -33,122 +33,136 @@ def build_shared_network(X, add_summaries=False):
     return fc1
 
 class PolicyEstimator():
-    """
-    Policy Function approximator. Given a observation, returns probabilities
-    over all possible actions
-    """
+  """
+  Policy Function approximator. Given a observation, returns probabilities
+  over all possible actions.
+  Args:
+    num_outputs: Size of the action space.
+    reuse: If true, an existing shared network will be re-used.
+    trainable: If true we add train ops to the network.
+      Actor threads that don't update their local models and don't need
+      train ops would set this to false.
+  """
 
-    def __init__(self, num_outputs, reuse=False, trainalbe=True):
-        self.num_outputs = num_outputs
+  def __init__(self, num_outputs, reuse=False, trainable=True):
+    self.num_outputs = num_outputs
 
-        # Placeholders for our input
-        # Our input are 4 RGB frames of shape 160, 160 each
-        self.states = tf.placeholder(shape=[None, 84, 84, 4], dtype=tf.uint8, name="X")
-        # The TD target value
-        self.targets = tf.placeholder(shape=[None], dtype=tf.int32, name="actions")
-        # Integer id of which action was selected
-        self.actions = tf.placeholder(shape=[None], dtype=tf.int32, name="actions")
+    # Placeholders for our input
+    # Our input are 4 RGB frames of shape 160, 160 each
+    self.states = tf.placeholder(shape=[None, 84, 84, 4], dtype=tf.uint8, name="X")
+    # The TD target value
+    self.targets = tf.placeholder(shape=[None], dtype=tf.float32, name="y")
+    # Integer id of which action was selected
+    self.actions = tf.placeholder(shape=[None], dtype=tf.int32, name="actions")
 
-        # Normalize
-        X = tf.to_float(self.states) / 255.0
-        batch_size = tf.shape(self.states)[0]
+    # Normalize
+    X = tf.to_float(self.states) / 255.0
+    batch_size = tf.shape(self.states)[0]
 
-        # Graph shared with Value Net
-        with tf.variable_scope("shared", reuse=reuse):
-            fc1 = build_shared_network(X, add_summaries=(not reuse))
+    # Graph shared with Value Net
+    with tf.variable_scope("shared", reuse=reuse):
+      fc1 = build_shared_network(X, add_summaries=(not reuse))
 
-        with tf.variable_scope("policy_net"):
-            self.logits = tf.contrib.layers.fully_connected(fc1, num_outputs, activation_fn=None)
-            self.probs = tf.nn.softmax(self.logits) + 1e-8
 
-            self.predictions = {
-                "logits": self.logits,
-                "probs": self.probs
-            }
+    with tf.variable_scope("policy_net"):
+      self.logits = tf.contrib.layers.fully_connected(fc1, num_outputs, activation_fn=None)
+      self.probs = tf.nn.softmax(self.logits) + 1e-8
 
-            # We add entropy to the loss to encourage exploration
-            self.entropy = -tf.reduce_sum(self.probs * tf.log(self.probs), 1, name="entropy")
-            self.entropy_mean = tf.reduce_mean(self.entropy, name="entropy_mean")
+      self.predictions = {
+        "logits": self.logits,
+        "probs": self.probs
+      }
 
-            # Get the predictions for the chosen actions only
-            gather_indices = tf.range(batch_size) * tf.shape(self.probs)[1] + self.actions
-            self.picked_action_probs = tf.gather(tf.reshape(self.probs, [-1]), gather_indices)
+      # We add entropy to the loss to encourage exploration
+      self.entropy = -tf.reduce_sum(self.probs * tf.log(self.probs), 1, name="entropy")
+      self.entropy_mean = tf.reduce_mean(self.entropy, name="entropy_mean")
 
-            self.losses = -(tf.log(self.picked_action_probs) * self.targets + 0.01 * self.entropy)
-            self.loss = tf.reduce_sum(self.losses, name="loss")
+      # Get the predictions for the chosen actions only
+      gather_indices = tf.range(batch_size) * tf.shape(self.probs)[1] + self.actions
+      self.picked_action_probs = tf.gather(tf.reshape(self.probs, [-1]), gather_indices)
 
-            tf.summary.scalar(self.loss.op.name, self.loss)
-            tf.summary.scalar(self.entropy_mean.op.name, self.entropy_mean)
-            tf.summary.histogram(self.entropy.op.name, self.entropy)
+      self.losses = - (tf.log(self.picked_action_probs) * self.targets + 0.01 * self.entropy)
+      self.loss = tf.reduce_sum(self.losses, name="loss")
 
-            if trainalbe:
-                # self.optimizer = tf.train.AdamOptimizer(1e-4)
-                self.optimizer = tf.train.RMSPropOptimizer(0.00025, 0.00, 0.0, 1e-6)
-                self.grads_and_vars = self.optimizer.compute_gradients(self.loss)
-                self.grads_and_vars = [ [grad, var] for grad, var in self.grads_and_vars if grad is not None ]
-                self.train_op = self.optimizer.apply_gradients(self.grads_and_vars, global_step=tf.train.global_step())
+      tf.summary.scalar(self.loss.op.name, self.loss)
+      tf.summary.scalar(self.entropy_mean.op.name, self.entropy_mean)
+      tf.summary.histogram(self.entropy.op.name, self.entropy)
 
-        # Merge summaries from this network and the shared network
-        var_scope_name = tf.get_variable_scope().name
-        summary_ops = tf.get_collection(tf.GraphKeys.SUMMARIES)
-        sumaries = [s for s in summary_ops if "policy_net" in s.name or "shared" in s.name]
-        sumaries = [s for s in summary_ops if var_scope_name in s.name]
-        self.summaries = tf.summary.merge(sumaries)
+      if trainable:
+        # self.optimizer = tf.train.AdamOptimizer(1e-4)
+        self.optimizer = tf.train.RMSPropOptimizer(0.00025, 0.99, 0.0, 1e-6)
+        self.grads_and_vars = self.optimizer.compute_gradients(self.loss)
+        self.grads_and_vars = [[grad, var] for grad, var in self.grads_and_vars if grad is not None]
+        self.train_op = self.optimizer.apply_gradients(self.grads_and_vars,
+          global_step=tf.contrib.framework.get_global_step())
+
+    # Merge summaries from this network and the shared network (but not the value net)
+    var_scope_name = tf.get_variable_scope().name
+    summary_ops = tf.get_collection(tf.GraphKeys.SUMMARIES)
+    sumaries = [s for s in summary_ops if "policy_net" in s.name or "shared" in s.name]
+    sumaries = [s for s in summary_ops if var_scope_name in s.name]
+    self.summaries = tf.summary.merge(sumaries)
 
 
 class ValueEstimator():
-    """
-    Value Function approximator. Returns a value estimator for a batch of observations.
-    """
+  """
+  Value Function approximator. Returns a value estimator for a batch of observations.
+  Args:
+    reuse: If true, an existing shared network will be re-used.
+    trainable: If true we add train ops to the network.
+      Actor threads that don't update their local models and don't need
+      train ops would set this to false.
+  """
 
-    def __init__(self, reuse=False, trainable=True):
-        # Placeholders for our input
-        # Our input are 4 RGB frames of shape 160, 160 each
-        self.states = tf.placeholder(shape=[None, 84, 84, 4], dtype=tf.uint8, name="X")
-        # The TD target value
-        self.targets = tf.placeholder(shape=[None], dtype=tf.float32, name="y")
+  def __init__(self, reuse=False, trainable=True):
+    # Placeholders for our input
+    # Our input are 4 RGB frames of shape 160, 160 each
+    self.states = tf.placeholder(shape=[None, 84, 84, 4], dtype=tf.uint8, name="X")
+    # The TD target value
+    self.targets = tf.placeholder(shape=[None], dtype=tf.float32, name="y")
 
-        X = tf.to_float(self.states) / 255.0
+    X = tf.to_float(self.states) / 255.0
 
-        # Graph shared with Value Net
-        with tf.variable_scope("shared", reuse=reuse):
-            fc1 = build_shared_network(X, add_summaries=(not reuse))
+    # Graph shared with Value Net
+    with tf.variable_scope("shared", reuse=reuse):
+      fc1 = build_shared_network(X, add_summaries=(not reuse))
 
-        with tf.variable_scope("value_net"):
-            self.logits = tf.contrib.layers.fully_connected(
-                inputs=fc1,
-                num_outputs=1,
-                activation_fn=None)
-            self.logits = tf.squeeze(self.logits, squeeze_dims=[1], name="logits")
+    with tf.variable_scope("value_net"):
+      self.logits = tf.contrib.layers.fully_connected(
+        inputs=fc1,
+        num_outputs=1,
+        activation_fn=None)
+      self.logits = tf.squeeze(self.logits, squeeze_dims=[1], name="logits")
 
-            self.losses = tf.squared_difference(self.logits, self.targets)
-            self.loss = tf.reduce_sum(self.losses, name="loss")
+      self.losses = tf.squared_difference(self.logits, self.targets)
+      self.loss = tf.reduce_sum(self.losses, name="loss")
 
-            self.predictions = {
-                "logits": self.logits
-            }
+      self.predictions = {
+        "logits": self.logits
+      }
 
-            # Summaries
-            prefix = tf.get_variable_scope().name
-            tf.summary.scalar(self.loss.name, self.loss)
-            tf.summary.scalar("{}/max_value".format(prefix), tf.reduce_max(self.logits))
-            tf.summary.scalar("{}/min_value".format(prefix), tf.reduce_min(self.logits))
-            tf.summary.scalar("{}/mean_value".format(prefix), tf.reduce_mean(self.logits))
-            tf.summary.scalar("{}/reward_max".format(prefix), tf.reduce_max(self.targets))
-            tf.summary.scalar("{}/reward_min".format(prefix), tf.reduce_min(self.targets))
-            tf.summary.scalar("{}/reward_mean".format(prefix), tf.reduce_mean(self.targets))
-            tf.summary.histogram("{}/reward_targets".format(prefix), self.targets)
-            tf.summary.histogram("{}/values".format(prefix), self.logits)
+      # Summaries
+      prefix = tf.get_variable_scope().name
+      tf.summary.scalar(self.loss.name, self.loss)
+      tf.summary.scalar("{}/max_value".format(prefix), tf.reduce_max(self.logits))
+      tf.summary.scalar("{}/min_value".format(prefix), tf.reduce_min(self.logits))
+      tf.summary.scalar("{}/mean_value".format(prefix), tf.reduce_mean(self.logits))
+      tf.summary.scalar("{}/reward_max".format(prefix), tf.reduce_max(self.targets))
+      tf.summary.scalar("{}/reward_min".format(prefix), tf.reduce_min(self.targets))
+      tf.summary.scalar("{}/reward_mean".format(prefix), tf.reduce_mean(self.targets))
+      tf.summary.histogram("{}/reward_targets".format(prefix), self.targets)
+      tf.summary.histogram("{}/values".format(prefix), self.logits)
 
-            if trainable:
-                # self.optimizer = tf.train.AdamOptimizer(1e-4)
-                self.optimizer = tf.train.RMSPropOptimizer(0.00025, 0.99, 0.0, 1e-6)
-                self.grads_and_vars = self.optimizer.compute_gradients(self.loss)
-                self.grads_and_vars = [[grad, var] for grad, var in self.grads_and_vars if grad is not None]
-                self.train_op = self.optimizer.apply_gradients(self.grads_and_vars, global_step = tf.train.global_step())
+      if trainable:
+        # self.optimizer = tf.train.AdamOptimizer(1e-4)
+        self.optimizer = tf.train.RMSPropOptimizer(0.00025, 0.99, 0.0, 1e-6)
+        self.grads_and_vars = self.optimizer.compute_gradients(self.loss)
+        self.grads_and_vars = [[grad, var] for grad, var in self.grads_and_vars if grad is not None]
+        self.train_op = self.optimizer.apply_gradients(self.grads_and_vars,
+          global_step=tf.contrib.framework.get_global_step())
 
-        var_scope_name = tf.get_variable_scope().name
-        summary_ops = tf.get_collection(tf.GraphKeys.SUMMARIES)
-        sumaries = [s for s in summary_ops if "policy_net" in s.name or "shared" in s.name]
-        sumaries = [s for s in summary_ops if var_scope_name in s.name]
-        self.summaries = tf.summary.merge(sumaries)
+    var_scope_name = tf.get_variable_scope().name
+    summary_ops = tf.get_collection(tf.GraphKeys.SUMMARIES)
+    sumaries = [s for s in summary_ops if "policy_net" in s.name or "shared" in s.name]
+    sumaries = [s for s in summary_ops if var_scope_name in s.name]
+    self.summaries = tf.summary.merge(sumaries)
